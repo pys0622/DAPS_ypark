@@ -177,7 +177,8 @@ docker-compose.override.yml
 /tmp/
 /.cache/
 /src/clip/
-
+/checkpoints/
+/dataset/
 
 *.pt
 *.pth
