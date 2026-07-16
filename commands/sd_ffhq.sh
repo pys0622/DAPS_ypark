@@ -17,7 +17,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=phase_retrieval \
-gpu=0 &
+gpu=0 \
+> results/logs/sd/ffhq/phase_retrieval.log 2>&1 &
 
 # nonlinear deblur
 python posterior_sample.py \
@@ -32,7 +33,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=nonlinear_blur \
-gpu=1 & 
+gpu=1 \
+> results/logs/sd/ffhq/nonlinear_blur.log 2>&1 & 
 
 # high dynamic range
 python posterior_sample.py \
@@ -47,7 +49,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=hdr \
-gpu=2 & 
+gpu=2 \
+> results/logs/sd/ffhq/hdr.log 2>&1 & 
 
 # ++++ Linear Tasks ++++
 # down sampling
@@ -63,7 +66,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=down_sampling \
-gpu=3 & 
+gpu=3 \
+> results/logs/sd/ffhq/down_sampling.log 2>&1 & 
 
 # Gaussian blur
 python posterior_sample.py \
@@ -78,7 +82,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=gaussian_blur \
-gpu=4 & 
+gpu=4 \
+> results/logs/sd/ffhq/gaussian_blur.log 2>&1 & 
 
 # motion blur
 python posterior_sample.py \
@@ -93,7 +98,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=motion_blur \
-gpu=5 & 
+gpu=5 \
+> results/logs/sd/ffhq/motion_blur.log 2>&1 & 
 
 # box inpainting 
 python posterior_sample.py \
@@ -108,7 +114,8 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=inpainting \
-gpu=6 & 
+gpu=6 \
+> results/logs/sd/ffhq/inpainting.log 2>&1 &
 
 # random inpainting
 python posterior_sample.py \
@@ -123,4 +130,5 @@ sampler.diffusion_scheduler_config.num_steps=2 \
 sampler.annealing_scheduler_config.num_steps=50 \
 batch_size=10 \
 name=inpainting_rand \
-gpu=7 & 
+gpu=7 \
+> results/logs/sd/ffhq/inpainting_rand.log 2>&1 & 

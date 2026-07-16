@@ -17,7 +17,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=phase_retrieval \
-gpu=0 &
+gpu=0 \
+> results/logs/pixel/imagenet/phase_retrieval.log 2>&1 &
 
 # nonlinear deblur
 python posterior_sample.py \
@@ -32,7 +33,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=nonlinear_blur \
-gpu=1 & 
+gpu=1 \
+> results/logs/pixel/imagenet/nonlinear_blur.log 2>&1 & 
 
 # high dynamic range
 python posterior_sample.py \
@@ -47,7 +49,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=hdr \
-gpu=2 & 
+gpu=2 \
+> results/logs/pixel/imagenet/hdr.log 2>&1 & 
 
 # ++++ Linear Tasks ++++
 # down sampling
@@ -63,7 +66,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=down_sampling \
-gpu=3 & 
+gpu=3 \
+> results/logs/pixel/imagenet/down_sampling.log 2>&1 & 
 
 # Gaussian blur
 python posterior_sample.py \
@@ -78,7 +82,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=gaussian_blur \
-gpu=4 & 
+gpu=4 \
+> results/logs/pixel/imagenet/gaussian_blur.log 2>&1 & 
 
 # motion blur
 python posterior_sample.py \
@@ -93,7 +98,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=motion_blur \
-gpu=5 & 
+gpu=5 \
+> results/logs/pixel/imagenet/motion_blur.log 2>&1 & 
 
 # box inpainting 
 python posterior_sample.py \
@@ -108,7 +114,8 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=inpainting \
-gpu=6 & 
+gpu=6 \
+> results/logs/pixel/imagenet/inpainting.log 2>&1 & 
 
 # random inpainting
 python posterior_sample.py \
@@ -123,4 +130,5 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=100 \
 name=inpainting_rand \
-gpu=7 & 
+gpu=7 \
+> results/logs/pixel/imagenet/inpainting_rand.log 2>&1 & 
