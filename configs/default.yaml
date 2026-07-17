@@ -1,5 +1,8 @@
 gpu: 0
 batch_size: 10
+eval_batch_size: 4
+lpips_batch_size: 4
+fid_batch_size: 8
 num_runs: 1
 save_dir: ./results
 name: demo
@@ -9,7 +12,7 @@ save_traj: True
 save_traj_video: False
 save_traj_raw_data: False
 show_eval: False
-eval_fid: False
+eval_fid: True
 eval_fn_list: ['psnr', 'ssim', 'lpips']
 task_group: pixel  # pixel, sd, or latent
 project_name: 'DAPS'

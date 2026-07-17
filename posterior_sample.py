@@ -40,13 +40,13 @@ def resize(y, x, task_name):
     return ry
 
 
-def safe_dir(dir):
-    """
-        get (or create) a directory
-    """
-    if not Path(dir).exists():
-        Path(dir).mkdir()
-    return Path(dir)
+def safe_dir(directory):
+    directory = Path(directory)
+    directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    return directory
 
 
 def norm(x):
@@ -62,7 +62,7 @@ def tensor_to_pils(x):
     """
     pils = []
     for x_ in x:
-        np_x = norm(x_).permute(1, 2, 0).cpu().numpy() * 255
+        np_x = norm(x_).permute(1, 2, 0).detach().cpu().numpy() * 255
         np_x = np_x.astype(np.uint8)
         pil_x = Image.fromarray(np_x)
         pils.append(pil_x)
@@ -73,40 +73,40 @@ def tensor_to_numpy(x):
     """
         [B, C, H, W] tensor -> [B, C, H, W] numpy
     """
-    np_images = norm(x).permute(0, 2, 3, 1).cpu().numpy() * 255
+    np_images = norm(x).permute(0, 2, 3, 1).detach().cpu().numpy() * 255
     return np_images.astype(np.uint8)
 
 
-def save_mp4_video(gt, y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, sec=5, space=4):
-    """
-        stack and save trajectory as mp4 video
-    """
-    writer = imageio.get_writer(output_path, fps=fps, codec='libx264', quality=8)
-    ix, iy = x0hat_traj.shape[-2:]
-    reindex = np.linspace(0, len(xt_traj) - 1, sec * fps).astype(int)
-    np_x0hat_traj = tensor_to_numpy(x0hat_traj[reindex])
-    np_x0y_traj = tensor_to_numpy(x0y_traj[reindex])
-    np_xt_traj = tensor_to_numpy(xt_traj[reindex])
-    np_y = tensor_to_numpy(y[None])[0]
-    np_gt = tensor_to_numpy(gt[None])[0]
-    for x0hat, x0y, xt in zip(np_x0hat_traj, np_x0y_traj, np_xt_traj):
-        canvas = np.ones((ix, 5 * iy + 4 * space, 3), dtype=np.uint8) * 255
-        cx = cy = 0
-        canvas[cx:cx + ix, cy:cy + iy] = np_y
+# def save_mp4_video(gt, y, x0hat_traj, x0y_traj, xt_traj, output_path, fps=24, sec=5, space=4):
+#     """
+#         stack and save trajectory as mp4 video
+#     """
+#     writer = imageio.get_writer(output_path, fps=fps, codec='libx264', quality=8)
+#     ix, iy = x0hat_traj.shape[-2:]
+#     reindex = np.linspace(0, len(xt_traj) - 1, sec * fps).astype(int)
+#     np_x0hat_traj = tensor_to_numpy(x0hat_traj[reindex])
+#     np_x0y_traj = tensor_to_numpy(x0y_traj[reindex])
+#     np_xt_traj = tensor_to_numpy(xt_traj[reindex])
+#     np_y = tensor_to_numpy(y[None])[0]
+#     np_gt = tensor_to_numpy(gt[None])[0]
+#     for x0hat, x0y, xt in zip(np_x0hat_traj, np_x0y_traj, np_xt_traj):
+#         canvas = np.ones((ix, 5 * iy + 4 * space, 3), dtype=np.uint8) * 255
+#         cx = cy = 0
+#         canvas[cx:cx + ix, cy:cy + iy] = np_y
 
-        cy += iy + space
-        canvas[cx:cx + ix, cy:cy + iy] = np_gt
+#         cy += iy + space
+#         canvas[cx:cx + ix, cy:cy + iy] = np_gt
 
-        cy += iy + space
-        canvas[cx:cx + ix, cy:cy + iy] = x0y
+#         cy += iy + space
+#         canvas[cx:cx + ix, cy:cy + iy] = x0y
 
-        cy += iy + space
-        canvas[cx:cx + ix, cy:cy + iy] = x0hat
+#         cy += iy + space
+#         canvas[cx:cx + ix, cy:cy + iy] = x0hat
 
-        cy += iy + space
-        canvas[cx:cx + ix, cy:cy + iy] = xt
-        writer.append_data(canvas)
-    writer.close()
+#         cy += iy + space
+#         canvas[cx:cx + ix, cy:cy + iy] = xt
+#         writer.append_data(canvas)
+#     writer.close()
 
 
 def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, record, batch_size, gt, args, root, run_id):
@@ -117,12 +117,13 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
     trajs = []
     for s in range(0, len(x_start), batch_size):
         # update evaluator to correct batch index
-        cur_x_start = x_start[s:s + batch_size]
-        cur_y = y[s:s + batch_size]
-        cur_gt = gt[s: s + batch_size]
+        e = min(s+batch_size, len(x_start))
+        cur_x_start = x_start[s:e]
+        cur_y = y[s:e]
+        cur_gt = gt[s:e]
         cur_samples = sampler.sample(model, cur_x_start, operator, cur_y, evaluator, verbose=verbose, record=record, gt=cur_gt)
 
-        samples.append(cur_samples)
+        samples.append(cur_samples.detach().cpu()) #to avoid oom
         if record:
             cur_trajs = sampler.trajectory.compile()
             trajs.append(cur_trajs)
@@ -131,7 +132,7 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
         if args.save_samples:
             pil_image_list = tensor_to_pils(cur_samples)
             image_dir = safe_dir(root / 'samples')
-            for idx in range(batch_size):
+            for idx in range(e-s):
                 image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id)
                 pil_image_list[idx].save(str(image_path))
 
@@ -145,14 +146,14 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
             cur_resized_y = resize(cur_y, cur_samples, args.task[args.task_group].operator.name)
             slices = np.linspace(0, len(x0hat_traj)-1, 10).astype(int)
             slices = np.unique(slices)
-            for idx in range(batch_size):
-                if args.save_traj_video:
-                    video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx+s, run_id))
-                    save_mp4_video(cur_samples[idx], cur_resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
+            for idx in range(e-s):
+                # if args.save_traj_video:
+                #     video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx+s, run_id))
+                #     save_mp4_video(cur_samples[idx], cur_resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
                 # save long grid images
                 selected_traj_grid = torch.cat([x0y_traj[slices, idx], x0hat_traj[slices, idx], xt_traj[slices, idx]], dim=0)
                 traj_grid_path = str(traj_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id))
-                save_image(selected_traj_grid * 0.5 + 0.5, fp=traj_grid_path, nrow=len(slices))
+                save_image(selected_traj_grid.detach().cpu() * 0.5 + 0.5, fp=traj_grid_path, nrow=len(slices))
         
     if record:
         trajs = Trajectory.merge(trajs)
@@ -166,15 +167,53 @@ def main(args):
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
-    torch.cuda.set_device('cuda:{}'.format(args.gpu))
+    device = 'cuda:{}'.format(args.gpu)
+    torch.cuda.set_device(device)
 
     setproctitle.setproctitle(args.name)
     print(yaml.dump(OmegaConf.to_container(args, resolve=True), indent=4))
+    
+    #Batch size constraints for evaluation
+    eval_batch_size = int(
 
+        getattr(args, "eval_batch_size", 8)
+
+    )
+
+    lpips_batch_size = int(
+
+        getattr(
+            args,
+            "lpips_batch_size",
+            eval_batch_size,
+        )
+    )
+
+    fid_batch_size = int(
+        getattr(args, "fid_batch_size", 8)
+    )
+
+    if eval_batch_size <= 0:
+        raise ValueError(
+            "eval_batch_size must be greater than zero."
+        )
+
+    if lpips_batch_size <= 0:
+
+        raise ValueError(
+            "lpips_batch_size must be greater than zero."
+        )
+
+    if fid_batch_size <= 0:
+        raise ValueError(
+            "fid_batch_size must be greater than zero."
+
+        )
     # get data
     dataset = get_dataset(**args.data)
     total_number = len(dataset)
     images = dataset.get_data(total_number, 0)
+    images = images.to(device)
 
     # get operator & measurement
     task_group = args.task[args.task_group]
@@ -190,8 +229,11 @@ def main(args):
     # get evaluator
     eval_fn_list = []
     for eval_fn_name in args.eval_fn_list:
-        eval_fn_list.append(get_eval_fn(eval_fn_name))
-    evaluator = Evaluator(eval_fn_list)
+        if eval_fn_name == 'lpips':
+            eval_fn_list.append(get_eval_fn(eval_fn_name, device = str(device), batch_size = lpips_batch_size))
+        else:
+            eval_fn_list.append(get_eval_fn(eval_fn_name))
+    evaluator = Evaluator(eval_fn_list, device=device, eval_batch_size = eval_batch_size)
 
     # log hyperparameters and configurations
     os.makedirs(args.save_dir, exist_ok=True)
@@ -219,12 +261,30 @@ def main(args):
                                          batch_size=args.batch_size, gt=images, args=args, root=root, run_id=r)
         full_samples.append(samples)
         full_trajs.append(trajs)
+        #remove reference dependancy
+        del x_start
+        del samples
+        del trajs
+        
+        #empty cache
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        
     full_samples = torch.stack(full_samples, dim=0)
+    
+    images = images.detach().cpu()
+    y = y.detach().cpu()
 
     # evaluate and log metrics
-    results = evaluator.report(images, y, full_samples)    
+    print(
+        "Evaluating metrics with "
+        f"eval_batch_size={eval_batch_size}..."
+
+    )
+    results = evaluator.report(images, y, full_samples,eval_batch_size=eval_batch_size,device=str(device))    
     if args.wandb:
-        evaluator.log_wandb(results, args.batch_size)
+        evaluator.log_wandb(results)
     markdown_text = evaluator.display(results)
     with open(str(root / 'eval.md'), 'w') as file:
         file.write(markdown_text)
@@ -232,9 +292,13 @@ def main(args):
     print(markdown_text)
 
     # log grid results
-    resized_y = resize(y, images, args.task[args.task_group].operator.name)
-    stack = torch.cat([images, resized_y, full_samples.flatten(0, 1)])
-    save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=total_number)
+    with torch.inference_mode():
+        resized_y = resize(y, images, args.task[args.task_group].operator.name)
+        stack = torch.cat([images.detach().cpu(), resized_y.detach().cpu(), full_samples.flatten(0, 1)],dim=0)
+        save_image(stack * 0.5 + 0.5, fp=str(root / 'grid_results.png'), nrow=total_number)
+        
+        del stack
+        del resized_y
     
     # save raw trajectory data
     if args.save_traj_raw_data:
@@ -247,6 +311,10 @@ def main(args):
     
     # evaluate FID score
     if args.eval_fid:
+        print(
+            "Calculating FID with "
+            f"fid_batch_size={fid_batch_size}..."
+        )
         print('Calculating FID...')
         fid_dir = safe_dir(root / 'fid')
         # select the best samples based on the best of the all runs
@@ -266,10 +334,12 @@ def main(args):
             pil_image_list[idx].save(str(image_path))
 
         fake_dataset = get_dataset(args.data.name, resolution=args.data.resolution, root=str(best_sample_dir))
-        real_loader = DataLoader(dataset, batch_size=100, shuffle=False)
-        fake_loader = DataLoader(fake_dataset, batch_size=100, shuffle=False)
+        real_loader = DataLoader(dataset, batch_size=fid_batch_size, shuffle=False)
+        fake_loader = DataLoader(fake_dataset, batch_size=fid_batch_size, shuffle=False)
 
-        fid_score = calculate_fid(real_loader, fake_loader)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        fid_score = calculate_fid(real_loader, fake_loader, device=str(device))
         print(f'FID Score: {fid_score.item():.4f}')
         with open(str(fid_dir / 'fid.txt'), 'w') as file:
             file.write(f'FID Score: {fid_score.item():.4f}')
