@@ -213,7 +213,7 @@ def main(args):
     dataset = get_dataset(**args.data)
     total_number = len(dataset)
     images = dataset.get_data(total_number, 0)
-    images = images.to(device)
+    # images = images.to(device)
 
     # get operator & measurement
     task_group = args.task[args.task_group]

@@ -33,7 +33,7 @@ sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
 batch_size=20 \
 name=nonlinear_blur \
-gpu=1 &\
+gpu=1 \
 > results/logs/pixel/ffhq/nonlinear_blur.log 2>&1 &
 
 # high dynamic range
