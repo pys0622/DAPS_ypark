@@ -13,7 +13,7 @@ class Evaluator:
         Evaluation module for computing evaluation metrics.
     """
 
-    def __init__(self, eval_fn_list, device = "cuda", eval_batch_size = 8):
+    def __init__(self, eval_fn_list):
         """
             Initializes the evaluator with the ground truth and measurement.
 
@@ -21,13 +21,10 @@ class Evaluator:
                 eval_fn_list (tuple): List of evaluation functions to use.
         """
         super().__init__()
-        self.eval_fn = {
-            eval_fn.name: eval_fn
-            for eval_fn in eval_fn_list
-        }
+        self.eval_fn = {}
+        for eval_fn in eval_fn_list:
+            self.eval_fn[eval_fn.name] = eval_fn
         self.main_eval_fn_name = eval_fn_list[0].name
-        self.device = torch.device(device)
-        self.eval_batch_size = int(eval_batch_size)
 
     def get_main_eval_fn(self):
         """
@@ -50,157 +47,31 @@ class Evaluator:
         for eval_fn_name, eval_fn in self.eval_fn.items():
             results[eval_fn_name] = eval_fn(gt, measurement, x, reduction)
         return results
-    @staticmethod
-    def to_list( x):
+
+    def to_list(self, x):
         return x.cpu().detach().tolist()
 
-    @staticmethod
-    def _normalize_metric_output(value, batch_size):
-        """
-        Convert metric output to one scalar per input sample.
-        Supported examples:
-            [B]
-            [B, 1]
-            [B, 1, 1, 1]
-            [B, C, H, W]
-        Non-batch dimensions are averaged.
-        """
-
-        if not torch.is_tensor(value):
-            value = torch.as_tensor(value)
-        if value.ndim == 0:
-            if batch_size != 1:
-                raise ValueError(
-                    "Metric returned a scalar for a batch larger than one "
-                    "while reduction='none' was requested."
-                )
-            return value.reshape(1)
-        if value.shape[0] != batch_size:
-            if value.numel() == batch_size:
-                return value.reshape(batch_size)
-            raise ValueError(
-                "Metric output does not preserve the batch dimension. "
-                f"Expected first dimension {batch_size}, "
-                f"but received shape {tuple(value.shape)}."
-            )
-        return value.reshape(batch_size, -1).mean(dim=1)
-    
-    def report(self, gt, measurement, x, eval_batch_size = None, device = None):
+    def report(self, gt, measurement, x):
         '''x: [N, B, C, H, W] or [B, C, H, W]'''
         if len(x.shape) == 4:
-            x = x.unsqueeze(0)
-        if x.ndim != 5:
-            raise ValueError(
-                "x must have shape [B, C, H, W] or "
-                "[N, B, C, H, W]. "
-                f"Received {tuple(x.shape)}."
-            )
-        num_runs, num_samples = x.shape[:2]
-        if gt.shape[0] != num_samples:
-            raise ValueError(
-                "Ground-truth sample count does not match reconstruction "
-                f"sample count: gt={gt.shape[0]}, x={num_samples}."
-            )
-
-        if measurement.shape[0] != num_samples:
-            raise ValueError(
-                "Measurement sample count does not match reconstruction "
-                f"sample count: measurement={measurement.shape[0]}, "
-                f"x={num_samples}."
-            )    
-        batch_size = (
-            self.eval_batch_size
-            if eval_batch_size is None
-            else int(eval_batch_size)
-
-        )
-
-        if batch_size <= 0:
-            raise ValueError("eval_batch_size must be greater than zero.")
-
-        eval_device = (
-            self.device
-            if device is None
-            else torch.device(device)
-        )
+            x = x[None]
         result_dicts = {}
 
         # eval function
-        with torch.inference_mode():
-            for metric_name, metric_fn in self.eval_fn.items():
-                values_per_run = []
-                for run_idx in range(num_runs):
-                    values_per_batch = []
-                    for start in range(0, num_samples, batch_size):
-                        end = min(start + batch_size, num_samples)
-                        current_gt = gt[start:end].to(
-                            eval_device,
-                            non_blocking=True,
-                        )
+        broadcasted_shape = torch.broadcast_shapes(x.shape, gt.shape)
+        x0_flatten = gt.expand(broadcasted_shape).flatten(0, 1)
+        x_flatten = x.expand(broadcasted_shape).flatten(0, 1)
+        y_flatten = measurement.expand((broadcasted_shape[0], *measurement.shape)).flatten(0, 1)
 
-                        current_measurement = measurement[start:end].to(
-                            eval_device,
-                            non_blocking=True,
-                        )
-
-                        current_sample = x[run_idx, start:end].to(
-                            eval_device,
-                            non_blocking=True,
-                        )
-
-                        value = metric_fn(
-                            current_gt,
-                            current_measurement,
-                            current_sample,
-                            reduction="none",
-                        )
-
-                        value = self._normalize_metric_output(
-                            value,
-                            batch_size=end - start,
-                        )
-
-                        values_per_batch.append(
-                            value.detach().cpu()
-                        )
-
-                        del current_gt
-                        del current_measurement
-                        del current_sample
-                        del value
-
-                    # [B]
-
-                    run_value = torch.cat(
-                        values_per_batch,
-                        dim=0,
-                    )
-
-                    values_per_run.append(run_value)
-                # [N, B]
-
-                value = torch.stack(
-                    values_per_run,
-                    dim=0,
-                )
-
-                mean_value = value.mean(dim=0)
-                if num_runs > 1:
-                    std_value = value.std(
-                        dim=0,
-                        unbiased=True,
-                    )
-                else:
-                    std_value = torch.zeros_like(mean_value)
-                result_dicts[metric_name] = {
-                    # [B, N]
-                    "sample": value.permute(1, 0).tolist(),
-                    # Statistics over runs for each image.
-                    "mean": mean_value.tolist(),
-                    "std": std_value.tolist(),
-                    "max": value.max(dim=0).values.tolist(),
-                    "min": value.min(dim=0).values.tolist(),
-                }
+        for key, fn in self.eval_fn.items():
+            value = fn(x0_flatten, y_flatten, x_flatten, reduction='none').reshape(broadcasted_shape[0], -1)
+            result_dicts[key] = {
+                'sample': self.to_list(value.permute(1, 0)),
+                'mean': self.to_list(value.mean(0)),
+                'std': self.to_list(value.std(0) if value.shape[0] != 1 else torch.zeros_like(value.mean(0))),
+                'max': self.to_list(value.max(0)[0]),
+                'min': self.to_list(value.min(0)[0]),
+            }
         return result_dicts
 
     def display(self, result_dicts):
@@ -221,31 +92,14 @@ class Evaluator:
 
         return table.get_string()
 
-    def log_wandb(self, result_dicts):
-        if not result_dicts:
-            return
-
-        first_metric_name = next(iter(result_dicts))
-        first_comparison_key = get_eval_fn_cmp(first_metric_name)
-        num_samples = len(
-            result_dicts[first_metric_name][first_comparison_key]
-        )
-
-        for sample_idx in range(num_samples):
-            log_dict = {
-                key: result_dicts[key][get_eval_fn_cmp(key)][sample_idx]
-                for key in result_dicts
-            }
+    def log_wandb(self, result_dicts, batch_size):
+        for s in range(batch_size):
+            log_dict = {key: result_dicts[key][get_eval_fn_cmp(key)][s] for key in result_dicts.keys()}
             wandb.log(log_dict)
-        
-        aggregate_log = {
-            f"{key}_all": np.mean(
-                result_dicts[key][get_eval_fn_cmp(key)]
-            )
-            for key in result_dicts
-        }
-
-        wandb.log(aggregate_log)
+        log_dict = {key: np.mean(result_dicts[key][get_eval_fn_cmp(key)]) for key in result_dicts.keys()}
+        new_log_dict = {key + '_all': value for key, value in log_dict.items()}
+        wandb.log(new_log_dict)
+        return
 
 
 class Table(object):
@@ -312,8 +166,7 @@ def get_eval_fn_cmp(name: str):
 
 
 class EvalFn(ABC):
-    @staticmethod
-    def norm(x):
+    def norm(self, x):
         return (x * 0.5 + 0.5).clip(0, 1)
 
     @abstractmethod
@@ -341,43 +194,18 @@ class StructuralSimilarityIndexMeasure(EvalFn):
 class LearnedPerceptualImagePatchSimilarity(EvalFn):
     cmp = 'min'  # the higher, the better
 
-    def __init__(self, device="cuda", batch_size=8):
-        self.device = torch.device(device)
-        self.batch_size = int(batch_size)
-        
-        if self.batch_size <= 0:
-            raise ValueError("LPIPS batch_size must be greater than zero.")
-        self.lpips_fn = LPIPS(replace_pooling=True, reduction='none').to(self.device)
-        self.lpips_fn.eval()
+    def __init__(self, batch_size=128):
+        self.batch_size = batch_size
+        self.lpips_fn = LPIPS(replace_pooling=True, reduction='none')
 
     def evaluate_in_batch(self, gt, pred):
-        # batch_size = self.batch_size
+        batch_size = self.batch_size
         results = []
-        with torch.inference_mode():
-            for start in range(0, gt.shape[0], self.batch_size):
-                end = min(start+self.batch_size, gt.shape[0])
-                current_gt = self.norm(
-                    gt[start:end]
-                ).to(
-                    self.device,
-                    non_blocking=True,
-                )
-
-                current_pred = self.norm(
-                    pred[start:end]
-                ).to(
-                    self.device,
-                    non_blocking=True,
-                )
-                result = self.lpips_fn(
-                    current_gt,
-                    current_pred,
-                )
-                results.append(result.detach().cpu())
-                del current_gt
-                del current_pred
-                del result
-        return torch.cat(results, dim=0)
+        for start in range(0, gt.shape[0], batch_size):
+            res = self.lpips_fn(self.norm(gt[start:start+batch_size]), self.norm(pred[start:start+batch_size]))
+            results.append(res)
+        results = torch.cat(results, dim=0)
+        return results
 
     def __call__(self, gt, measurement, sample, reduction='none'):
         res = self.evaluate_in_batch(gt, sample)
