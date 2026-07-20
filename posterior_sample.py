@@ -117,9 +117,10 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
     trajs = []
     for s in range(0, len(x_start), batch_size):
         # update evaluator to correct batch index
-        cur_x_start = x_start[s:s + batch_size]
-        cur_y = y[s:s + batch_size]
-        cur_gt = gt[s: s + batch_size]
+        e = min(len(x_start), s+batch_size)
+        cur_x_start = x_start[s:e]
+        cur_y = y[s:e]
+        cur_gt = gt[s: e]
         cur_samples = sampler.sample(model, cur_x_start, operator, cur_y, evaluator, verbose=verbose, record=record, gt=cur_gt)
 
         samples.append(cur_samples)
@@ -131,7 +132,7 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
         if args.save_samples:
             pil_image_list = tensor_to_pils(cur_samples)
             image_dir = safe_dir(root / 'samples')
-            for idx in range(batch_size):
+            for idx in range(e-s):
                 image_path = image_dir / '{:05d}_run{:04d}.png'.format(idx+s, run_id)
                 pil_image_list[idx].save(str(image_path))
 
@@ -145,7 +146,7 @@ def sample_in_batch(sampler, model, x_start, operator, y, evaluator, verbose, re
             cur_resized_y = resize(cur_y, cur_samples, args.task[args.task_group].operator.name)
             slices = np.linspace(0, len(x0hat_traj)-1, 10).astype(int)
             slices = np.unique(slices)
-            for idx in range(batch_size):
+            for idx in range(e-s):
                 if args.save_traj_video:
                     video_path = str(traj_dir / '{:05d}_run{:04d}.mp4'.format(idx+s, run_id))
                     save_mp4_video(cur_samples[idx], cur_resized_y[idx], x0hat_traj[:, idx], x0y_traj[:, idx], xt_traj[:, idx], video_path)
