@@ -15,7 +15,7 @@ save_dir=results/pixel/ffhq \
 num_runs=4 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=phase_retrieval \
 gpu=0 \
 > results/logs/pixel/ffhq/phase_retrieval.log 2>&1 &
@@ -31,7 +31,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=nonlinear_blur \
 gpu=1 \
 > results/logs/pixel/ffhq/nonlinear_blur.log 2>&1 &
@@ -47,7 +47,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=hdr \
 gpu=2 \
 > results/logs/pixel/ffhq/hdr.log 2>&1 &
@@ -64,7 +64,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=down_sampling \
 gpu=3 \
 > results/logs/pixel/ffhq/down_sampling.log 2>&1 &
@@ -81,7 +81,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=gaussian_blur \
 gpu=4 \
 > results/logs/pixel/ffhq/gaussian_blur.log 2>&1 &
@@ -98,7 +98,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=motion_blur \
 gpu=5 \
 > results/logs/pixel/ffhq/motion_blur.log 2>&1 &
@@ -115,7 +115,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=inpainting \
 gpu=6 \
 > results/logs/pixel/ffhq/inpainting.log 2>&1 &
@@ -132,7 +132,7 @@ save_dir=results/pixel/ffhq \
 num_runs=1 \
 sampler.diffusion_scheduler_config.num_steps=5 \
 sampler.annealing_scheduler_config.num_steps=200 \
-batch_size=20 \
+batch_size=8 \
 name=inpainting_rand \
 gpu=7 \
 > results/logs/pixel/ffhq/inpainting_rand.log 2>&1 &
